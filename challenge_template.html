@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sicherheitsüberprüfung / Security Check</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f9;
+      color: #333;
+
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    .wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    h1 {
+      font-size: 2em;
+      margin: 0.4em 0 0.3em;
+    }
+
+    p {
+      font-size: 1.2em;
+      margin: 0.6em 0;
+    }
+
+    .spinner {
+      margin: 2em 0;
+      width: 50px;
+      height: 50px;
+      border: 5px solid #ccc;
+      border-top: 5px solid #333;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <!-- German Section -->
+    <h1>Einen Moment Geduld...</h1>
+    <p>Im Hintergrund läuft gerade eine kleine<br>
+    mathematische Herausforderung - ganz automatisch<br>
+    zur Bestätigung, dass Sie kein Bot sind 🔒.</p>
+    <p>⏳ In wenigen Sekunden geht es weiter.</p>
+
+    <!-- Spinner -->
+    <div class="spinner"></div>
+
+    <!-- English Section -->
+    <h1>Just a moment...</h1>
+    <p>A small mathematical challenge is running<br>
+    in the background - fully automatic to confirm<br>
+    you're not a bot 🔒.</p>
+    <p>⏳ You'll be redirected shortly.</p>
+  </div>
+
+  <script>{{ .Script }}</script>
+</body>
+</html>
