@@ -15,7 +15,6 @@
 package botbarrier
 
 import (
-	"strconv"
 	"time"
 
 	"github.com/caddyserver/caddy/v2"
@@ -51,16 +50,10 @@ func (bb *BotBarrier) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.ArgErr()
 				}
 			case "complexity":
-				// Parse the complexity of the computational challenge
-				var complexityStr string
-				if !d.Args(&complexityStr) {
+				// Allow placeholders for complexity
+				if !d.Args(&bb.Complexity) {
 					return d.ArgErr()
 				}
-				complexity, err := strconv.Atoi(complexityStr)
-				if err != nil {
-					return d.Errf("invalid complexity: %v", err)
-				}
-				bb.Complexity = complexity
 			case "valid_for":
 				var validFor string
 				if !d.Args(&validFor) {
