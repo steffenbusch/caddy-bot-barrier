@@ -44,44 +44,32 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 func (bb *BotBarrier) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	for d.Next() {
 		for d.NextBlock(0) {
-			switch d.Val() {
+			param := d.Val()
+			var arg string
+			if !d.Args(&arg) {
+				return d.ArgErr()
+			}
+			switch param {
 			case "secret":
-				if !d.Args(&bb.Secret) {
-					return d.ArgErr()
-				}
+				bb.Secret = arg
 			case "complexity":
-				// Allow placeholders for complexity
-				if !d.Args(&bb.Complexity) {
-					return d.ArgErr()
-				}
+				bb.Complexity = arg
 			case "valid_for":
-				var validFor string
-				if !d.Args(&validFor) {
-					return d.ArgErr()
-				}
-				duration, err := time.ParseDuration(validFor)
+				duration, err := time.ParseDuration(arg)
 				if err != nil {
 					return d.Errf("invalid duration: %v", err)
 				}
 				bb.ValidFor = duration
 			case "seed_cookie_name":
-				if !d.Args(&bb.SeedCookieName) {
-					return d.ArgErr()
-				}
+				bb.SeedCookieName = arg
 			case "solution_cookie_name":
-				if !d.Args(&bb.SolutionCookieName) {
-					return d.ArgErr()
-				}
+				bb.SolutionCookieName = arg
 			case "mac_cookie_name":
-				if !d.Args(&bb.MacCookieName) {
-					return d.ArgErr()
-				}
+				bb.MacCookieName = arg
 			case "template":
-				if !d.Args(&bb.TemplatePath) {
-					return d.ArgErr()
-				}
+				bb.TemplatePath = arg
 			default:
-				return d.Errf("unknown option: %s", d.Val())
+				return d.Errf("unknown option: %s", param)
 			}
 		}
 	}

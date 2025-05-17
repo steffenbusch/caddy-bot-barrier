@@ -137,6 +137,12 @@ func (bb *BotBarrier) Validate() error {
 	if bb.Secret == "" {
 		return fmt.Errorf("secret must be configured")
 	}
+
+	// Validate complexity
+	if _, err := strconv.Atoi(bb.Complexity); err != nil && bb.Complexity[0] != '{' {
+		return fmt.Errorf("complexity must be an integer or a placeholder like {vars.complexity}, found: %s", bb.Complexity)
+	}
+
 	return nil
 }
 
@@ -157,9 +163,8 @@ func (bb BotBarrier) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 	complexityStr := repl.ReplaceAll(bb.Complexity, "16")
 	complexity, err := strconv.Atoi(complexityStr)
 	if err != nil || complexity < 0 {
-		logger.Warn("Invalid complexity value after placeholder replacement", zap.String("complexity", complexityStr), zap.Error(err))
-		http.Error(w, "Invalid complexity configuration", http.StatusInternalServerError)
-		return nil
+		logger.Error("Invalid complexity value after placeholder replacement, defaulting to 16", zap.String("complexity", complexityStr), zap.Error(err))
+		complexity = 16 // Default to 16 if parsing fails
 	}
 
 	// Skip challenge if complexity is 0
