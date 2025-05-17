@@ -28,6 +28,7 @@ import (
 func init() {
 	caddy.RegisterModule(BotBarrier{})
 	httpcaddyfile.RegisterHandlerDirective("bot_barrier", parseCaddyfile)
+	httpcaddyfile.RegisterDirectiveOrder("bot_barrier", "before", "basic_auth")
 }
 
 // parseCaddyfile parses the Caddyfile configuration
