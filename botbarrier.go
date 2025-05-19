@@ -186,38 +186,10 @@ func (bb *BotBarrier) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 		http.Error(w, "Seed generation failed", http.StatusInternalServerError)
 		return nil
 	}
-	seedHex := hex.EncodeToString(seed)
+
 	mac := bb.createMAC(seed)
-	logger.Debug("Generated seed and MAC", zap.String("seed", seedHex), zap.String("mac", hex.EncodeToString(mac)))
-
-	// Add a custom response header for the challenge page
-	// This header helps identify responses serving the challenge page.
-	// It can be useful for debugging, monitoring, or analytics purposes.
-	w.Header().Set("X-Bot-Barrier", "challenge")
-
-	var tmpl *template.Template
-	if bb.TemplatePath == defaultHTML {
-		tmpl, err = template.New("default").Parse(defaultHTML)
-	} else {
-		bb.logger.Debug("Loading template from file", zap.String("template_path", bb.TemplatePath))
-		tmpl, err = template.ParseFiles(bb.TemplatePath)
-	}
-	if err != nil {
-		bb.logger.Error("Failed to load template", zap.Error(err))
-		http.Error(w, "Failed to load template", http.StatusInternalServerError)
-		return nil
-	}
-
-	// Process the embedded JavaScript as a template
-	jsTemplate, err := template.New("script").Parse(embeddedJS)
-	if err != nil {
-		bb.logger.Error("Failed to process embedded script", zap.Error(err))
-		http.Error(w, "Failed to process embedded script", http.StatusInternalServerError)
-		return nil
-	}
-	var scriptBuffer bytes.Buffer
 	data := map[string]any{
-		"Seed":           seedHex,
+		"Seed":           hex.EncodeToString(seed),
 		"MAC":            hex.EncodeToString(mac),
 		"Complexity":     complexity,
 		"SeedCookie":     bb.SeedCookieName,
@@ -225,20 +197,53 @@ func (bb *BotBarrier) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 		"MacCookie":      bb.MacCookieName,
 		"MaxAge":         int(bb.ValidFor.Seconds()),
 	}
-	if err := jsTemplate.Execute(&scriptBuffer, data); err != nil {
-		bb.logger.Error("Failed to render script", zap.Error(err))
-		http.Error(w, "Failed to render script", http.StatusInternalServerError)
+
+	// Add a custom response header for the challenge page
+	// This header helps identify responses serving the challenge page.
+	// It can be useful for debugging, monitoring, or analytics purposes.
+	w.Header().Set("X-Bot-Barrier", "challenge")
+
+	if err := bb.renderChallengePage(w, data); err != nil {
+		logger.Error("Failed to render challenge page", zap.Error(err))
+		http.Error(w, "Failed to render challenge page", http.StatusInternalServerError)
 		return nil
+	}
+
+	logger.Info("Challenge page served successfully")
+	return nil
+}
+
+func (bb *BotBarrier) renderChallengePage(w http.ResponseWriter, data map[string]any) error {
+	var tmpl *template.Template
+	var err error
+
+	if bb.TemplatePath == defaultHTML {
+		tmpl, err = template.New("default").Parse(defaultHTML)
+	} else {
+		bb.logger.Debug("Loading custom template from file", zap.String("template_path", bb.TemplatePath))
+		tmpl, err = template.ParseFiles(bb.TemplatePath)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to load template: %w", err)
+	}
+
+	// Process the embedded JavaScript as a template
+	jsTemplate, err := template.New("script").Parse(embeddedJS)
+	if err != nil {
+		return fmt.Errorf("failed to process embedded script: %w", err)
+	}
+
+	var scriptBuffer bytes.Buffer
+	if err := jsTemplate.Execute(&scriptBuffer, data); err != nil {
+		return fmt.Errorf("failed to render script: %w", err)
 	}
 
 	data["Script"] = template.JS(scriptBuffer.String())
 	w.Header().Set("Content-Type", "text/html")
 	if err := tmpl.Execute(w, data); err != nil {
-		bb.logger.Error("Failed to render template", zap.Error(err))
-		http.Error(w, "Failed to render template", http.StatusInternalServerError)
-		return nil
+		return fmt.Errorf("failed to render template: %w", err)
 	}
-	logger.Info("Challenge page served successfully")
+
 	return nil
 }
 
