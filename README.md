@@ -49,7 +49,7 @@ This plugin introduces a middleware that:
 - **`secret`**: The secret key used to generate and validate HMACs for the challenge seed.
   - Default: A random secret is generated during provisioning if not explicitly provided.
   - *Usage Tip*: Use a long, random string for better security.
-  - **Caddy Placeholder Support**: You can use placeholders like `{file./path/to/secret.txt}` to load the secret from a file.
+  - **Caddy Placeholder Support**: Placeholders like `{file./path/to/secret.txt}` are supported, but only during initialization. The resolved value is used for the lifetime of the module.
 
 - **`complexity`**: Defines the number of leading zero bits required in the hash (`SHA512(seed || nonce)`) for the challenge to be considered solved.
   - Default: `16`.
