@@ -1,3 +1,4 @@
 /caddy
 /Caddyfile
 /custom_challenge_template.html
+/.reflex.conf

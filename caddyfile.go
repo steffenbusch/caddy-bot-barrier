@@ -15,8 +15,6 @@
 package botbarrier
 
 import (
-	"time"
-
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
@@ -55,11 +53,11 @@ func (bb *BotBarrier) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 			case "complexity":
 				bb.Complexity = arg
 			case "valid_for":
-				duration, err := time.ParseDuration(arg)
+				duration, err := caddy.ParseDuration(arg)
 				if err != nil {
 					return d.Errf("invalid duration: %v", err)
 				}
-				bb.ValidFor = duration
+				bb.ValidFor = caddy.Duration(duration)
 			case "seed_cookie_name":
 				bb.SeedCookieName = arg
 			case "solution_cookie_name":

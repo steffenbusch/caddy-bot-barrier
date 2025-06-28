@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/caddyserver/caddy/v2"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -38,7 +39,7 @@ func TestCreateMAC(t *testing.T) {
 
 func TestIsSeedValid(t *testing.T) {
 	bb := BotBarrier{
-		ValidFor:   10 * time.Minute,
+		ValidFor:   caddy.Duration(10 * time.Minute),
 		Complexity: "16",
 		logger:     zaptest.NewLogger(t),
 	}
@@ -50,7 +51,7 @@ func TestIsSeedValid(t *testing.T) {
 	if !valid {
 		t.Fatalf("Expected seed to be valid")
 	}
-	if age > bb.ValidFor {
+	if age > time.Duration(bb.ValidFor) {
 		t.Fatalf("Expected seed age to be within valid duration, got %v", age)
 	}
 }
@@ -58,7 +59,7 @@ func TestIsSeedValid(t *testing.T) {
 func TestCheckSolution(t *testing.T) {
 	bb := BotBarrier{
 		Secret:             "testsecret",
-		ValidFor:           10 * time.Minute,
+		ValidFor:           caddy.Duration(10 * time.Minute),
 		SeedCookieName:     "__challenge_seed",
 		SolutionCookieName: "__challenge_solution",
 		MacCookieName:      "__challenge_mac",

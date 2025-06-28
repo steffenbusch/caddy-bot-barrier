@@ -57,7 +57,7 @@ type BotBarrier struct {
 
 	// ValidFor specifies the duration for which a challenge seed is valid.
 	// After this duration, the client must solve a new challenge.
-	ValidFor time.Duration `json:"valid_for,omitempty"`
+	ValidFor caddy.Duration `json:"valid_for,omitempty"`
 
 	// SeedCookieName is the name of the cookie that stores the challenge seed.
 	// Defaults to "__challenge_seed" if not specified.
@@ -95,7 +95,7 @@ func (bb *BotBarrier) Provision(ctx caddy.Context) error {
 		bb.Complexity = "16" // Default complexity
 	}
 	if bb.ValidFor == 0 {
-		bb.ValidFor = 10 * time.Minute
+		bb.ValidFor = caddy.Duration(10 * time.Minute)
 	}
 	if bb.SeedCookieName == "" {
 		bb.SeedCookieName = "__challenge_seed"
@@ -124,7 +124,7 @@ func (bb *BotBarrier) Provision(ctx caddy.Context) error {
 
 	bb.logger.Info("BotBarrier module provisioned successfully",
 		zap.String("complexity", bb.Complexity),
-		zap.Duration("valid_for", bb.ValidFor),
+		zap.Duration("valid_for", time.Duration(bb.ValidFor)),
 		zap.String("seed_cookie_name", bb.SeedCookieName),
 		zap.String("solution_cookie_name", bb.SolutionCookieName),
 		zap.String("mac_cookie_name", bb.MacCookieName),
@@ -195,7 +195,7 @@ func (bb *BotBarrier) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 		"SeedCookie":     bb.SeedCookieName,
 		"SolutionCookie": bb.SolutionCookieName,
 		"MacCookie":      bb.MacCookieName,
-		"MaxAge":         int(bb.ValidFor.Seconds()),
+		"MaxAge":         int(time.Duration(bb.ValidFor).Seconds()),
 	}
 
 	// Add a custom response header for the challenge page
@@ -294,7 +294,7 @@ func (bb *BotBarrier) checkSolution(r *http.Request, complexity int, logger *zap
 	// Validate the seed and get its age
 	age, valid := bb.isSeedValid(seedBytes)
 	if !valid {
-		logger.Warn("Expired seed", zap.String("seed", seedCookie.Value), zap.Duration("age", age), zap.Duration("valid_for", bb.ValidFor))
+		logger.Warn("Expired seed", zap.String("seed", seedCookie.Value), zap.Duration("age", age), zap.Duration("valid_for", time.Duration(bb.ValidFor)))
 		return false
 	}
 
@@ -325,7 +325,7 @@ func (bb *BotBarrier) checkSolution(r *http.Request, complexity int, logger *zap
 			zap.Int("leading_zero_bits", leadingZeroBits),
 			zap.Int("required_complexity", complexity),
 			zap.Duration("seed_age", age),
-			zap.Duration("valid_for", bb.ValidFor),
+			zap.Duration("valid_for", time.Duration(bb.ValidFor)),
 		)
 		return true
 	}
@@ -347,8 +347,8 @@ func (bb *BotBarrier) isSeedValid(seed []byte) (time.Duration, bool) {
 	ts := binary.BigEndian.Uint64(seed[0:8]) // Extract the timestamp from the first 8 bytes of the seed
 	now := uint64(time.Now().Unix())
 	age := time.Duration(now-ts) * time.Second
-	if age >= 0 && age <= bb.ValidFor {
-		bb.logger.Debug("Seed is valid", zap.Duration("age", age), zap.Duration("valid_for", bb.ValidFor))
+	if age >= 0 && age <= time.Duration(bb.ValidFor) {
+		bb.logger.Debug("Seed is valid", zap.Duration("age", age), zap.Duration("valid_for", time.Duration(bb.ValidFor)))
 		return age, true
 	}
 	return age, false
