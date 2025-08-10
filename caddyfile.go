@@ -43,6 +43,11 @@ func (bb *BotBarrier) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	for d.Next() {
 		for d.NextBlock(0) {
 			param := d.Val()
+			// No argument required for this parameter
+			if param == "disable_csp_header" {
+				bb.DisableCSPHeader = true
+				continue
+			}
 			var arg string
 			if !d.Args(&arg) {
 				return d.ArgErr()

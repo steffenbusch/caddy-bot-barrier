@@ -128,6 +128,34 @@ bot_barrier {
 }
 ```
 
+## Content Security Policy (CSP) and Custom Templates
+
+By default, the challenge page is served with a strict Content-Security-Policy (CSP) header that uses a random nonce for each request. The CSP header is:
+
+```text
+default-src 'none'; script-src 'nonce-<nonce>' 'unsafe-inline'; style-src 'self' 'nonce-<nonce>'; base-uri 'none'; object-src 'none';
+```
+
+The nonce is available in the template context as `.CSPNonce` and is added to the `<script>` and `<style>` tags in the built-in template.
+
+**If you use a custom template**, you must ensure that all `<script>` and `<style>` tags include the nonce attribute, for example:
+
+```html
+<style nonce="{{ .CSPNonce }}"> ... </style>
+<script nonce="{{ .CSPNonce }}"> ... </script>
+```
+
+This is required for the CSP to allow inline scripts and styles.
+
+If you want to disable the CSP header entirely (for example, for development or advanced customization), you can use the `disable_csp_header` option in your Caddyfile configuration:
+
+```caddyfile
+bot_barrier {
+    # ...other options...
+    disable_csp_header
+}
+```
+
 ## Custom Templates
 
 You can provide a custom HTML template for the challenge page using the `template` option. If not specified, a default embedded template is used.
@@ -140,10 +168,16 @@ bot_barrier {
 }
 ```
 
-The template must include a placeholder for the embedded JavaScript:
+The template must include a placeholder for the embedded JavaScript and the CSP nonce:
 
 ```html
-<script>{{ .Script }}</script>
+<script nonce="{{ .CSPNonce }}">{{ .Script }}</script>
+```
+
+If you use inline styles, also add the nonce:
+
+```html
+<style nonce="{{ .CSPNonce }}"> ... </style>
 ```
 
 ---

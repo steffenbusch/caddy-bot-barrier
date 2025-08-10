@@ -20,6 +20,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha512"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -74,6 +75,9 @@ type BotBarrier struct {
 	// TemplatePath specifies the path to a custom HTML template for the challenge page.
 	// If not provided, a default embedded template will be used.
 	TemplatePath string `json:"template,omitempty"`
+
+	// DisableCSPHeader disables Bot-Barriers own Content-Security-Policy header.
+	DisableCSPHeader bool `json:"disable_csp_header,omitempty"`
 
 	// logger provides structured logging for the module.
 	logger *zap.Logger
@@ -213,6 +217,16 @@ func (bb *BotBarrier) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 	return nil
 }
 
+// generateCSPNonce generates a random base64-encoded nonce suitable for use in Content-Security-Policy headers.
+func generateCSPNonce() (string, error) {
+	nonceBytes := make([]byte, 18) // 18 bytes (144 bits) avoids `==` padding in base64
+	_, err := rand.Read(nonceBytes)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(nonceBytes), nil
+}
+
 func (bb *BotBarrier) renderChallengePage(w http.ResponseWriter, data map[string]any) error {
 	var tmpl *template.Template
 	var err error
@@ -239,7 +253,20 @@ func (bb *BotBarrier) renderChallengePage(w http.ResponseWriter, data map[string
 	}
 
 	data["Script"] = template.JS(scriptBuffer.String())
+
+	// Generate a CSP nonce and add it to the template data
+	cspNonce, err := generateCSPNonce()
+	if err != nil {
+		return fmt.Errorf("failed to generate CSP nonce: %w", err)
+	}
+	data["CSPNonce"] = template.HTMLAttr(cspNonce)
+
 	w.Header().Set("Content-Type", "text/html")
+	if !bb.DisableCSPHeader {
+		// Note: 'unsafe-inline' is ignored by browsers supporting nonces/hashes if a nonce or a hash is present.
+		// It has been added to be backward compatible with older browsers.
+		w.Header().Set("Content-Security-Policy", fmt.Sprintf("default-src 'none'; script-src 'nonce-%s' 'unsafe-inline'; style-src 'self' 'nonce-%s'; base-uri 'none'; object-src 'none';", cspNonce, cspNonce))
+	}
 	if err := tmpl.Execute(w, data); err != nil {
 		return fmt.Errorf("failed to render template: %w", err)
 	}
