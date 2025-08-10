@@ -123,7 +123,7 @@ func (bb *BotBarrier) Provision(ctx caddy.Context) error {
 			return fmt.Errorf("failed to generate random secret: %v", err)
 		}
 		bb.Secret = hex.EncodeToString(randomSecret)
-		bb.logger.Warn("No secret configured, generated a random secret", zap.String("secret", bb.Secret))
+		bb.logger.Warn("No secret configured, generated a random secret")
 	}
 
 	bb.logger.Info("BotBarrier module provisioned successfully",
