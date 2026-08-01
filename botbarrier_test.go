@@ -1,16 +1,19 @@
 package botbarrier
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha512"
 	"encoding/binary"
 	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/caddyserver/caddy/v2"
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -128,4 +131,80 @@ func TestRenderChallengePageSetsNoStoreHeaders(t *testing.T) {
 	if got := rec.Header().Get("Vary"); got != "Cookie" {
 		t.Fatalf("expected Vary header %q, got %q", "Cookie", got)
 	}
+}
+
+func TestValidateRejectsStaticComplexityAboveMax(t *testing.T) {
+	bb := BotBarrier{
+		Secret:     "testsecret",
+		Complexity: "33",
+	}
+
+	if err := bb.Validate(); err == nil {
+		t.Fatal("expected Validate to reject complexity above 32")
+	}
+}
+
+func TestServeHTTPClampsResolvedComplexityToMax(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := newRequestWithReplacer(http.MethodGet, "https://example.com/", "700")
+
+	bb := BotBarrier{
+		Secret:             "testsecret",
+		Complexity:         "{vars.bot_barrier_complexity}",
+		ValidFor:           caddy.Duration(10 * time.Minute),
+		SeedCookieName:     "__challenge_seed",
+		SolutionCookieName: "__challenge_solution",
+		MacCookieName:      "__challenge_mac",
+		TemplatePath:       defaultHTML,
+		logger:             zaptest.NewLogger(t),
+	}
+
+	err := bb.ServeHTTP(rec, req, caddyhttp.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+		t.Fatal("next handler should not be called for an unsolved challenge")
+		return nil
+	}))
+	if err != nil {
+		t.Fatalf("ServeHTTP returned an error: %v", err)
+	}
+
+	if !strings.Contains(rec.Body.String(), "const complexity = 32;") {
+		t.Fatalf("expected rendered challenge to clamp complexity to 32, body was: %s", rec.Body.String())
+	}
+}
+
+func TestServeHTTPDefaultsInvalidResolvedComplexityToDefault(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := newRequestWithReplacer(http.MethodGet, "https://example.com/", "invalid")
+
+	bb := BotBarrier{
+		Secret:             "testsecret",
+		Complexity:         "{vars.bot_barrier_complexity}",
+		ValidFor:           caddy.Duration(10 * time.Minute),
+		SeedCookieName:     "__challenge_seed",
+		SolutionCookieName: "__challenge_solution",
+		MacCookieName:      "__challenge_mac",
+		TemplatePath:       defaultHTML,
+		logger:             zaptest.NewLogger(t),
+	}
+
+	err := bb.ServeHTTP(rec, req, caddyhttp.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+		t.Fatal("next handler should not be called for an unsolved challenge")
+		return nil
+	}))
+	if err != nil {
+		t.Fatalf("ServeHTTP returned an error: %v", err)
+	}
+
+	if !strings.Contains(rec.Body.String(), "const complexity = 16;") {
+		t.Fatalf("expected rendered challenge to default complexity to 16, body was: %s", rec.Body.String())
+	}
+}
+
+func newRequestWithReplacer(method, target, complexity string) *http.Request {
+	req := httptest.NewRequest(method, target, nil)
+	repl := caddy.NewReplacer()
+	repl.Set("vars.bot_barrier_complexity", complexity)
+	ctx := context.WithValue(req.Context(), caddy.ReplacerCtxKey, repl)
+	ctx = context.WithValue(ctx, caddyhttp.VarsCtxKey, map[string]any{})
+	return req.WithContext(ctx)
 }

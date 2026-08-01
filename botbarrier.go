@@ -43,6 +43,11 @@ var defaultHTML string
 //go:embed challenge.js
 var embeddedJS string
 
+const (
+	defaultComplexity = 16
+	maxComplexity     = 32
+)
+
 // BotBarrier is a Caddy middleware module that requires clients to solve a computational challenge
 // before granting access to HTTP resources. It helps reduce automated bot traffic.
 type BotBarrier struct {
@@ -96,7 +101,7 @@ func (bb *BotBarrier) Provision(ctx caddy.Context) error {
 	bb.logger = ctx.Logger(bb)
 
 	if bb.Complexity == "" {
-		bb.Complexity = "16" // Default complexity
+		bb.Complexity = strconv.Itoa(defaultComplexity)
 	}
 	if bb.ValidFor == 0 {
 		bb.ValidFor = caddy.Duration(10 * time.Minute)
@@ -142,9 +147,16 @@ func (bb *BotBarrier) Validate() error {
 		return fmt.Errorf("secret must be configured")
 	}
 
-	// Validate complexity
-	if _, err := strconv.Atoi(bb.Complexity); err != nil && bb.Complexity[0] != '{' {
+	if bb.Complexity != "" && bb.Complexity[0] == '{' {
+		return nil
+	}
+
+	complexity, err := strconv.Atoi(bb.Complexity)
+	if err != nil {
 		return fmt.Errorf("complexity must be an integer or a placeholder like {vars.complexity}, found: %s", bb.Complexity)
+	}
+	if complexity < 0 || complexity > maxComplexity {
+		return fmt.Errorf("complexity must be between 0 and %d, found: %d", maxComplexity, complexity)
 	}
 
 	return nil
@@ -164,11 +176,17 @@ func (bb *BotBarrier) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 
 	// Replace placeholders in Complexity
 	repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
-	complexityStr := repl.ReplaceAll(bb.Complexity, "16")
+	complexityStr := repl.ReplaceAll(bb.Complexity, strconv.Itoa(defaultComplexity))
 	complexity, err := strconv.Atoi(complexityStr)
-	if err != nil || complexity < 0 {
+	if err != nil {
 		logger.Error("Invalid complexity value after placeholder replacement, defaulting to 16", zap.String("complexity", complexityStr), zap.Error(err))
-		complexity = 16 // Default to 16 if parsing fails
+		complexity = defaultComplexity
+	} else if complexity < 0 {
+		logger.Error("Resolved complexity below 0, defaulting to 16", zap.Int("complexity", complexity))
+		complexity = defaultComplexity
+	} else if complexity > maxComplexity {
+		logger.Warn("Resolved complexity above supported maximum, clamping to avoid impractical client-side work", zap.Int("complexity", complexity), zap.Int("maximum_complexity", maxComplexity))
+		complexity = maxComplexity
 	}
 
 	// Skip challenge if complexity is 0

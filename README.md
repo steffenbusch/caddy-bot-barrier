@@ -53,8 +53,10 @@ This plugin introduces a middleware that:
 
 - **`complexity`**: Defines the number of leading zero bits required in the hash (`SHA512(seed || nonce)`) for the challenge to be considered solved.
   - Default: `16`.
+  - Allowed range: `0..32`.
   - Higher values increase the difficulty of the challenge, making it harder for bots to solve quickly.
   - **Caddy Placeholder Support**: You can use placeholders like `{vars.bot_barrier_complexity}` to dynamically set the complexity for each HTTP request.
+  - Use only trusted placeholders for `complexity`. Invalid or negative resolved values fall back to `16`, and values above `32` are clamped to `32`.
 
 - **`valid_for`**: Specifies the duration for which a challenge seed is valid.
   - Default: `10m` (10 minutes).
@@ -99,6 +101,8 @@ This plugin introduces a middleware that:
 ## Complexity (`complexity`)
 
 The `complexity` parameter defines the number of leading zero bits required in the hash (`SHA512(seed || nonce)`) for the challenge to be considered solved. This directly controls the difficulty of the computational challenge.
+
+Because this challenge runs in browsers, Bot Barrier restricts `complexity` to `0..32` rather than the theoretical `SHA-512` bit width. Static configuration values outside that range are rejected. When `complexity` is resolved dynamically via placeholders, invalid or negative values fall back to `16`, and values above `32` are clamped to `32`.
 
 ### Estimated Durations
 
