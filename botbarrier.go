@@ -262,6 +262,12 @@ func (bb *BotBarrier) renderChallengePage(w http.ResponseWriter, data map[string
 	data["CSPNonce"] = template.HTMLAttr(cspNonce)
 
 	w.Header().Set("Content-Type", "text/html")
+	// Challenge responses contain reusable proof material and must not be cached by
+	// browsers or intermediaries.
+	w.Header().Set("Cache-Control", "no-store, private")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+	w.Header().Set("Vary", "Cookie")
 	if !bb.DisableCSPHeader {
 		// Note: 'unsafe-inline' is ignored by browsers supporting nonces/hashes if a nonce or a hash is present.
 		// It has been added to be backward compatible with older browsers.

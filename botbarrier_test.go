@@ -95,3 +95,37 @@ func TestCheckSolution(t *testing.T) {
 		t.Fatalf("Expected solution to be valid")
 	}
 }
+
+func TestRenderChallengePageSetsNoStoreHeaders(t *testing.T) {
+	bb := BotBarrier{
+		TemplatePath: defaultHTML,
+	}
+
+	rec := httptest.NewRecorder()
+	data := map[string]any{
+		"Seed":           "00112233445566778899aabbccddeeff",
+		"MAC":            "00",
+		"Complexity":     16,
+		"SeedCookie":     "__challenge_seed",
+		"SolutionCookie": "__challenge_solution",
+		"MacCookie":      "__challenge_mac",
+		"MaxAge":         600,
+	}
+
+	if err := bb.renderChallengePage(rec, data); err != nil {
+		t.Fatalf("renderChallengePage returned an error: %v", err)
+	}
+
+	if got := rec.Header().Get("Cache-Control"); got != "no-store, private" {
+		t.Fatalf("expected Cache-Control header %q, got %q", "no-store, private", got)
+	}
+	if got := rec.Header().Get("Pragma"); got != "no-cache" {
+		t.Fatalf("expected Pragma header %q, got %q", "no-cache", got)
+	}
+	if got := rec.Header().Get("Expires"); got != "0" {
+		t.Fatalf("expected Expires header %q, got %q", "0", got)
+	}
+	if got := rec.Header().Get("Vary"); got != "Cookie" {
+		t.Fatalf("expected Vary header %q, got %q", "Cookie", got)
+	}
+}
