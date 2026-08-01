@@ -44,7 +44,7 @@ var defaultHTML string
 var embeddedJS string
 
 // BotBarrier is a Caddy middleware module that requires clients to solve a computational challenge
-// before granting access to HTTP resources. It helps mitigate bot traffic.
+// before granting access to HTTP resources. It helps reduce automated bot traffic.
 type BotBarrier struct {
 	// Secret is the key used to generate and validate HMACs for the challenge seed.
 	// If not provided, a random secret will be generated during provisioning.
