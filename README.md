@@ -1,6 +1,6 @@
 # Caddy Bot Barrier Plugin
 
-The **Bot Barrier** plugin for [Caddy](https://caddyserver.com) enforces a browser-based computational challenge before granting access to HTTP resources. It helps mitigate bot traffic while imposing minimal delays on legitimate users.
+The **Bot Barrier** plugin for [Caddy](https://caddyserver.com) enforces a browser-based computational challenge before granting access to HTTP resources. It helps reduce automated bot traffic by increasing the computational cost of requests while imposing minimal delays on legitimate users.
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/steffenbusch/caddy-bot-barrier)](https://goreportcard.com/report/github.com/steffenbusch/caddy-bot-barrier)
 
@@ -16,7 +16,7 @@ This plugin introduces a middleware that:
 ### Key Capabilities
 
 - **Automatic Verification**: The challenge is solved automatically by the browser using JavaScript.
-- **Time-Limited Challenges**: Challenges expire after a configurable duration to prevent replay attacks.
+- **Time-Limited Challenges**: Challenges expire after a configurable duration, limiting the time window in which a solved challenge can be reused.
 - **Cookie-Based Validation**: Uses cryptographically signed cookies to verify challenge solutions.
 
 ## Request Flow
@@ -118,6 +118,8 @@ The `complexity` parameter defines the number of leading zero bits required in t
 
 The `valid_for` configuration determines how long a seed is considered valid.
 
+`valid_for` limits challenge lifetime. It does not provide single-use semantics and does not prevent replay within that lifetime.
+
 Example:
 
 ```caddyfile
@@ -127,6 +129,32 @@ bot_barrier {
   valid_for 30m
 }
 ```
+
+## Security Considerations
+
+### Replay of Solved Challenges
+
+Bot Barrier uses a stateless design. A successfully solved challenge is represented by three cookies containing the challenge seed, the solution, and an HMAC authenticating the seed.
+
+The HMAC prevents clients from modifying or forging challenge seeds without knowledge of the configured secret. It does not make a solved challenge single-use.
+
+Any client that possesses a complete valid cookie set can replay it until the `valid_for` period expires. The cookie set is not bound to a specific IP address, browser, user agent, TLS connection, or authenticated application context, may be transferred to another client, and remains valid until the embedded timestamp expires. Bot Barrier also does not keep server-side state to mark a challenge as consumed.
+
+This behaviour is intentional and follows from the stateless design. The `valid_for` setting limits the replay window, but does not prevent replay within that window.
+
+Bot Barrier is a traffic mitigation and proof-of-work mechanism, not an authentication or authorisation mechanism. A successful Bot Barrier challenge must not be interpreted as proof of identity, proof of session ownership, or authorisation to perform sensitive actions.
+
+For endpoints with side effects, deployments should use additional controls appropriate to the protected operation, such as server-side rate limiting to reduce the impact of replayed challenge cookies.
+
+Shorter `valid_for` values reduce the period during which a solved challenge can be reused, but cause legitimate clients to solve the challenge more frequently.
+
+### IP Address Binding
+
+Bot Barrier deliberately does not bind challenge solutions to client IP addresses.
+
+IP binding can reduce the portability of a solved challenge, but it does not provide reliable replay protection and can reject legitimate clients whose addresses change due to mobile networks, proxies, carrier-grade NAT, IPv6 prefix changes, or load-balancer configurations.
+
+Applications that nevertheless require client-specific or single-use challenges should implement that binding at the application layer or use an additional stateful verification mechanism.
 
 ## Content Security Policy (CSP) and Custom Templates
 

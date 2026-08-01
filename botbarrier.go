@@ -365,7 +365,7 @@ func (bb *BotBarrier) checkSolution(r *http.Request, complexity int, logger *zap
 }
 
 // isSeedValid checks if the timestamp embedded in the seed is within the allowed time window.
-// This ensures that the seed is not too old and prevents replay attacks.
+// This ensures that the seed is not too old and limits the replay window.
 func (bb *BotBarrier) isSeedValid(seed []byte) (time.Duration, bool) {
 	if len(seed) < 8 {
 		bb.logger.Warn("Seed too short", zap.Int("length", len(seed)))
