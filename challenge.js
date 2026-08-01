@@ -80,6 +80,9 @@ function countLeadingZeros(buf) {
   and checks if the hash meets the required complexity.
 */}}
 (async () => {
+  // Let the browser paint the challenge page before the PoW loop starts.
+  await new Promise(requestAnimationFrame);
+  await new Promise(r => setTimeout(r, 0));
   while (true) {
     {{/*
       Generate a random nonce and store it in the nonce view of the buffer.
