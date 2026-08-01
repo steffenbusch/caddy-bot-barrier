@@ -69,23 +69,7 @@ func TestCheckSolution(t *testing.T) {
 		logger:             zaptest.NewLogger(t),
 	}
 
-	seed := make([]byte, 16)
-	now := uint64(time.Now().Unix())
-	binary.BigEndian.PutUint64(seed[0:8], now)
-	mac := bb.createMAC(seed)
-
-	// Find a nonce that meets the complexity requirement
-	var nonce []byte
-	var hash [64]byte
-	for i := uint64(0); ; i++ {
-		nonce = make([]byte, 8)
-		binary.BigEndian.PutUint64(nonce, i)
-		combined := append(seed, nonce...)
-		hash = sha512.Sum512(combined)
-		if countLeadingZeroBits(hash[:]) >= 16 {
-			break
-		}
-	}
+	seed, nonce, mac := validChallengeMaterial(t, bb, 16)
 
 	// Create a mock HTTP request with cookies
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -96,6 +80,58 @@ func TestCheckSolution(t *testing.T) {
 	valid := bb.checkSolution(req, 16, bb.logger)
 	if !valid {
 		t.Fatalf("Expected solution to be valid")
+	}
+}
+
+func TestCheckSolutionRejectsUnexpectedCookieLengths(t *testing.T) {
+	bb := BotBarrier{
+		Secret:             "testsecret",
+		ValidFor:           caddy.Duration(10 * time.Minute),
+		SeedCookieName:     "__challenge_seed",
+		SolutionCookieName: "__challenge_solution",
+		MacCookieName:      "__challenge_mac",
+		logger:             zaptest.NewLogger(t),
+	}
+
+	seed, nonce, mac := validChallengeMaterial(t, bb, 16)
+
+	tests := []struct {
+		name     string
+		seed     string
+		solution string
+		mac      string
+	}{
+		{
+			name:     "short seed",
+			seed:     hex.EncodeToString(seed[:seedSizeBytes-1]),
+			solution: hex.EncodeToString(nonce),
+			mac:      hex.EncodeToString(mac),
+		},
+		{
+			name:     "long solution",
+			seed:     hex.EncodeToString(seed),
+			solution: hex.EncodeToString(append(nonce, 0)),
+			mac:      hex.EncodeToString(mac),
+		},
+		{
+			name:     "short mac",
+			seed:     hex.EncodeToString(seed),
+			solution: hex.EncodeToString(nonce),
+			mac:      hex.EncodeToString(mac[:macSizeBytes-1]),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req.AddCookie(&http.Cookie{Name: bb.SeedCookieName, Value: tc.seed})
+			req.AddCookie(&http.Cookie{Name: bb.SolutionCookieName, Value: tc.solution})
+			req.AddCookie(&http.Cookie{Name: bb.MacCookieName, Value: tc.mac})
+
+			if bb.checkSolution(req, 16, bb.logger) {
+				t.Fatal("expected solution to be rejected for invalid cookie length")
+			}
+		})
 	}
 }
 
@@ -207,4 +243,25 @@ func newRequestWithReplacer(method, target, complexity string) *http.Request {
 	ctx := context.WithValue(req.Context(), caddy.ReplacerCtxKey, repl)
 	ctx = context.WithValue(ctx, caddyhttp.VarsCtxKey, map[string]any{})
 	return req.WithContext(ctx)
+}
+
+func validChallengeMaterial(t *testing.T, bb BotBarrier, complexity int) ([]byte, []byte, []byte) {
+	t.Helper()
+
+	seed := make([]byte, seedSizeBytes)
+	now := uint64(time.Now().Unix())
+	binary.BigEndian.PutUint64(seed[0:8], now)
+	mac := bb.createMAC(seed)
+
+	var nonce []byte
+	var hash [64]byte
+	for i := uint64(0); ; i++ {
+		nonce = make([]byte, solutionSizeBytes)
+		binary.BigEndian.PutUint64(nonce[solutionSizeBytes-8:], i)
+		combined := append(seed, nonce...)
+		hash = sha512.Sum512(combined)
+		if countLeadingZeroBits(hash[:]) >= complexity {
+			return seed, nonce, mac
+		}
+	}
 }
