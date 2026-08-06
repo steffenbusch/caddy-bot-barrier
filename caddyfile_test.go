@@ -64,7 +64,7 @@ func containsComplexity(resp *http.Response, complexity int) bool {
 	if err != nil {
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check if the body contains the exact string "const complexity = <value>;"
 	expectedString := fmt.Sprintf("const complexity = %d;", complexity)
